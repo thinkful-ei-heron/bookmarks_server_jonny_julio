@@ -1,0 +1,7 @@
+node_modules
+.env
+.idea/workspace.xml
+.idea/vcs.xml
+.idea/modules.xml
+.idea/misc.xml
+.idea/Jonny_Dan_Bookmarks-server.iml
