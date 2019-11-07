@@ -32,11 +32,6 @@ bookmarksRouter
       logger.error(error);
       return res.status(400).send(error);
     }
-    if (!description) {
-      const error = 'Description is required';
-      logger.error(error);
-      return res.status(400).send(error);
-    }
     if (!rating) {
       const error = 'Rating is required';
       logger.error(error);
