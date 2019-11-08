@@ -1,5 +1,6 @@
 const express = require('express');
 const xss = require('xss');
+const {isWebUri} = require('valid-url')
 const logger = require('../logger');
 const bookmarksRouter = express.Router();
 const bodyParser = express.json();
@@ -9,6 +10,40 @@ const knexInstance = knex({
     client: 'pg',
     connection: process.env.DB_URL,
 });
+
+const NO_ERRORS = null;
+
+function getBookmarkValidationError({url, rating}) {
+    if (rating &&
+        (!Number.isInteger(rating) || rating < 0 || rating > 5)) {
+        logger.error(`Invalid rating '${rating}' supplied`)
+        return {
+            error: {
+                message: `'rating' must be a number between 0 and 5`
+            }
+        }
+    }
+
+    if (url && !isWebUri(url)) {
+        logger.error(`Invalid url '${url}' supplied`)
+        return {
+            error: {
+                message: `'url' must be a valid URL`
+            }
+        }
+    }
+
+    return NO_ERRORS
+}
+
+const serializeBookmark = bookmark => ({
+    id: bookmark.id,
+    title: xss(bookmark.title),
+    url: bookmark.url,
+    description: xss(bookmark.description),
+    rating: Number(bookmark.rating),
+});
+
 bookmarksRouter
     .route('/')
     .get((req, res, next) => {
@@ -23,19 +58,25 @@ bookmarksRouter
         const {title, url, description, rating} = req.body;
 
         if (!title) {
-            const error = 'Title is required';
+            const error = 'title is required';
             logger.error(error);
-            return res.status(400).send(error);
+            return res.status(400).send({
+                error: {message: error}
+            });
         }
         if (!url) {
-            const error = 'URL is required';
+            const error = 'url is required';
             logger.error(error);
-            return res.status(400).send(error);
+            return res.status(400).send({
+                error: {message: error}
+            });
         }
         if (!rating) {
-            const error = 'Rating is required';
+            const error = 'rating is required';
             logger.error(error);
-            return res.status(400).send(error);
+            return res.status(400).send({
+                error: {message: error}
+            });
         }
 
         const bookmark = {
@@ -44,11 +85,17 @@ bookmarksRouter
             description,
             rating
         };
+        const error = getBookmarkValidationError(bookmark);
+
+        if (error) return res.status(400).send(error);
 
         const knexInstance = req.app.get('db');
         BookService.insertBookmark(knexInstance, bookmark)
-            .then(bookmarks => {
-                res.json(bookmarks)
+            .then(bookmark => {
+                logger.info(`Bookmark with id ${bookmark.id} created.`);
+            res
+                .status(201)
+                .json(serializeBookmark(bookmark));
             })
             .catch(next);
     });
